@@ -1,23 +1,33 @@
-// IntakeCoralCommand.cpp
 #include "commands/IntakeCoralCommand.h"
+#include <frc/smartdashboard/SmartDashboard.h>
 
-IntakeCoralCommand::IntakeCoralCommand(CoralSubsystem* coralSubsystem)
-    : m_coralSubsystem{coralSubsystem} {
-    AddRequirements(m_coralSubsystem);
+IntakeCoralCommand::IntakeCoralCommand(IntakeSubsystem* intakeSubsystem, UltrasonicSensor* ultrasonicSensor)
+    : m_intakeSubsystem(intakeSubsystem), m_ultrasonicSensor(ultrasonicSensor) {
+    AddRequirements(m_intakeSubsystem);
 }
 
 void IntakeCoralCommand::Initialize() {
-    m_coralSubsystem->StartIntake();
+    // Start the intake motor
+    m_intakeSubsystem->StartIntake();
 }
 
 void IntakeCoralCommand::Execute() {
-    // Intake logic (if needed)
-}
+    // Check the ultrasonic sensor distance
+    double distance = m_ultrasonicSensor->GetDistance();
+    frc::SmartDashboard::PutNumber("Ultrasonic Distance", distance);
 
-void IntakeCoralCommand::End(bool interrupted) {
-    m_coralSubsystem->StopIntake();
+    // Stop if the coral is detected (e.g., distance < 10 cm)
+    if (distance < 10.0) {
+        m_intakeSubsystem->StopIntake();
+    }
 }
 
 bool IntakeCoralCommand::IsFinished() {
-    return false; // Run until interrupted
+    // Finish when the coral is detected and intake is stopped
+    return m_intakeSubsystem->IsIntakeStopped();
+}
+
+void IntakeCoralCommand::End(bool interrupted) {
+    // Ensure the intake is stopped
+    m_intakeSubsystem->StopIntake();
 }
