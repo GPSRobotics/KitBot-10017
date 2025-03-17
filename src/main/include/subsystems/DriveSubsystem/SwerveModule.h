@@ -20,11 +20,11 @@
 
 using namespace frc;
 using namespace ctre::phoenix6;
-using namespace rev;
+using namespace rev::spark;
 
 class SwerveModule {
 public:
-    SwerveModule(hardware::TalonFX *drivingMotor, CANSparkMax *turningMotor, 
+    SwerveModule(hardware::TalonFX *drivingMotor, SparkMax *turningMotor, 
                  DutyCycleEncoder *thetaEncoder, double thetaEncoderOffset = 0);
 
     units::meter_t GetDriveEncoderDistance() const;

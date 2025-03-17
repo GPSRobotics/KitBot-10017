@@ -1,5 +1,6 @@
 #include "subsystems/AlgaeSubsystem/AlgaeSubsystem.h"
 
+using namespace rev::spark;
 AlgaeSubsystem::AlgaeSubsystem()
     : wristMotor{kWristPort, CANSparkMax::MotorType::kBrushless},
       intakeMotor{kIntakePort, CANSparkMax::MotorType::kBrushless},
@@ -27,7 +28,7 @@ void AlgaeSubsystem::Periodic() {
         units::turn_t posTarget{(wristAngle - kWristStartAngle) / kTurnsPerDegree};
 
         // Set target position with feedforward
-        wristPID.SetReference(posTarget.value(), CANSparkMax::ControlType::kPosition, 0, feedForward);
+        wristPID.SetReference(posTarget.value(), SparkMax::ControlType::kPosition, 0, feedForward);
 
         // Log data to SmartDashboard
         frc::SmartDashboard::PutNumber("Algae Wrist Position", wristEncoder.GetPosition());
@@ -98,7 +99,7 @@ frc2::CommandPtr AlgaeSubsystem::GetMoveCommand(units::degree_t target) {
 
 void AlgaeSubsystem::ConfigureWrist() {
     wristMotor.RestoreFactoryDefaults();
-    wristMotor.SetIdleMode(CANSparkMax::IdleMode::kBrake);
+    wristMotor.SetIdleMode(SparkMax::IdleMode::kBrake);
     wristMotor.SetSmartCurrentLimit(40);
     wristMotor.SetInverted(false);
 
@@ -112,7 +113,7 @@ void AlgaeSubsystem::ConfigureWrist() {
 
 void AlgaeSubsystem::ConfigureIntake() {
     intakeMotor.RestoreFactoryDefaults();
-    intakeMotor.SetIdleMode(CANSparkMax::IdleMode::kBrake);
+    intakeMotor.SetIdleMode(SparkMax::IdleMode::kBrake);
     intakeMotor.SetSmartCurrentLimit(40);
     intakeMotor.SetInverted(false);
 }

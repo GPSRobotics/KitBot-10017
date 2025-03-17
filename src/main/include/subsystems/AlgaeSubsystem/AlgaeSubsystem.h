@@ -1,15 +1,16 @@
 #pragma once
 
 #include <frc2/command/SubsystemBase.h>
-#include <rev/CANSparkMax.h> // For Spark MAX motors
+#include <rev/SparkMax.h> // For Spark MAX motors
 #include <units/angle.h>
 #include <units/time.h>
 #include <frc/smartdashboard/SmartDashboard.h>
-#include "Constants.h"
+#include "subsystems/AlgaeSubsystem/Constants.h"
 
 using namespace frc;
 using namespace rev;
 using namespace AlgaeConstants;
+using namespace rev::spark;
 
 class AlgaeSubsystem : public frc2::SubsystemBase {
 public:
@@ -37,14 +38,14 @@ public:
 
 private:
     // Motors
-    CANSparkMax wristMotor;
-    CANSparkMax intakeMotor;
+    SparkMax wristMotor;
+    SparkMax intakeMotor;
 
     // Encoder for wrist position
-    SparkMaxRelativeEncoder wristEncoder;
+    SparkRelativeEncoder wristEncoder;
 
     // PID controller for wrist
-    SparkMaxPIDController wristPID;
+    SparkMaxConfigAccessor wristPID;
 
     // Subsystem states
     IntakeStates intakeState = IntakeStates::kIntakeOff;
