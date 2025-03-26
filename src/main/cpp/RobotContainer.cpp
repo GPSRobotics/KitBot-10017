@@ -1,5 +1,10 @@
+// Copyright (c) FIRST and other WPILib contributors.
+// Open Source Software; you can modify and/or share it under the terms of
+// the WPILib BSD license file in the root directory of this project.
+
 #include "RobotContainer.h"
 #include <utility>
+
 #include <iostream>
 #include <frc/controller/PIDController.h>
 #include <frc/shuffleboard/Shuffleboard.h>
@@ -12,6 +17,7 @@
 
 #include "GlobalConstants.h"
 
+// return current Alliance from either FMS or Driver Station
 bool RobotContainer::IsBlue() {
   return frc::DriverStation::GetAlliance() == frc::DriverStation::Alliance::kBlue;
 }
@@ -31,57 +37,122 @@ frc2::Command* RobotContainer::GetEmptyCommand() {
 }
 
 RobotContainer::RobotContainer() {
-  autonChooser.SetDefaultOption("None", "None");
-  SmartDashboard::PutData(std::move(&autonChooser));
+  // Autonomous selector configuration
+  autonChooser.SetDefaultOption("None", noneAuto.get());
+  autonChooser.AddOption("MoveOffLine", moveOffLine.get());
+  
+  SmartDashboard::PutData(std::move(&autonChooser));  // send auton selector to Shuffleboard
 
-  odomTrigger.WhileTrue(std::move(repeatOdom));
-
+  odomTrigger.WhileTrue(std::move(repeatOdom)); // trigger to handle odom updates from AprilTags
+ 
   /*******Controller Bindings*******/
   
-  // Intake/Outtake Coral
-  controller.A().OnTrue(frc2::cmd::RunOnce([this] { coral.SetIntakePower(1.0); }, {&coral}));
-  controller.A().OnFalse(frc2::cmd::RunOnce([this] { coral.SetIntakePower(0.0); }, {&coral}));
-  controller.B().OnTrue(frc2::cmd::RunOnce([this] { coral.SetIntakePower(-1.0); }, {&coral}));
-  controller.B().OnFalse(frc2::cmd::RunOnce([this] { coral.SetIntakePower(0.0); }, {&coral}));
+  /*controller.POVLeft().OnTrue(std::move(targetArbitrary));*/
 
-  // Intake/Outtake Algae
-  controller.X().OnTrue(frc2::cmd::RunOnce([this] { algae.SetIntakePower(1.0); }, {&algae}));
-  controller.X().OnFalse(frc2::cmd::RunOnce([this] { algae.SetIntakePower(0.0); }, {&algae}));
-  controller.Y().OnTrue(frc2::cmd::RunOnce([this] { algae.SetIntakePower(-1.0); }, {&algae}));
-  controller.Y().OnFalse(frc2::cmd::RunOnce([this] { algae.SetIntakePower(0.0); }, {&algae}));
+  //Turn lock toggles
+  controller.LeftStick().OnTrue(std::move(toggleOmegaOverride));
 
-  // Raise/Lift Cascade
-  controller.LeftBumper().OnTrue(frc2::cmd::RunOnce([this] {
-    double currentHeight = cascade.GetPosition().value();
-    double newHeight = currentHeight + 0.5; // Raise by 0.5 meters
-    if (newHeight > 1.5) newHeight = 1.5; // Cap at 1.5 meters
-    cascade.SetTargetPosition(units::meter_t{newHeight});
-  }, {&cascade}));
+  // Uncomment for actual use to prevent dumbass
+  // controller.A().OnTrue(std::move(m_drive.FollowPathCommand("Example Path")));
 
-  controller.RightBumper().OnTrue(frc2::cmd::RunOnce([this] {
-    double currentHeight = cascade.GetPosition().value();
-    double newHeight = currentHeight - 0.5; // Lower by 0.5 meters
-    if (newHeight < 0.0) newHeight = 0.0; // Cap at 0 meters
-    cascade.SetTargetPosition(units::meter_t{newHeight});
-  }, {&cascade}));
+  // Controller rumble commands 
+  // controller.Start().OnTrue(std::move(rumblePrimaryOn));
+  // controller.Start().OnFalse(std::move(rumblePrimaryOff));
+
+  // controller.Start().OnTrue(SetMultijoint(0.0_m, 80_deg));
+
+  /*controller.Back().OnTrue(cascade.GetMoveCommand(0.2475_m));*/
+
+/*   mainBack.OnTrue(frc2::cmd::Either(
+        SetMultijoint(0.0_m, -45_deg),
+        SetMultijoint(0.07_m, 80_deg),
+        [&]() { return TrackingTarget == GlobalConstants::kAlgaeMode; }
+   ));*/
+
+  // Level 1
+  /*mainDpadDown.OnTrue(cascade.GetMoveCommand(0.435_m)); */
+/*   mainDpadDown.OnTrue(frc2::cmd::Either(
+        SetMultijoint(0.0_m, -15.0_deg),
+        SetMultijoint(0.15_m, 80_deg),
+        [&]() { return TrackingTarget == GlobalConstants::kAlgaeMode; }
+   ));*/
+
+  // Level 2
+  /*mainDpadRight.OnTrue(cascade.GetMoveCommand(0.623_m)); */
+/*   mainDpadRight.OnTrue(frc2::cmd::Either(
+        SetMultijoint(0.38_m, 0_deg),
+        SetMultijoint(0.38_m, 80_deg),
+        [&]() { return TrackingTarget == GlobalConstants::kAlgaeMode; }
+   ));/
+  // Level 3
+  /*mainDpadLeft.OnTrue(cascade.GetMoveCommand(0.998_m)); */
+/*   mainDpadLeft.OnTrue(frc2::cmd::Either(
+        SetMultijoint(0.76_m, 0_deg),
+        SetMultijoint(0.76_m, 80_deg),
+        [&]() { return TrackingTarget == GlobalConstants::kAlgaeMode; }
+
+   ));*/
+  // Level 4
+  /*mainDpadUp.OnTrue(cascade.GetMoveCommand(1.47_m));*/
+  //  mainDpadUp.OnTrue(frc2::cmd::Either(
+  //       SetMultijoint(1.3_m, 60.0_deg),
+  //       SetMultijoint(1.3_m, 80.0_deg),
+  //       [&]() { return TrackingTarget == GlobalConstants::kAlgaeMode; }
+  //  ));
+  
+  // Change global target to coral
+  controller.LeftBumper().OnTrue(std::move(targetCoral)); 
+
+  //Later change so that clicking cycles through
+  
+  // Change global target to algae 
+  controller.RightBumper().OnTrue(std::move(targetAlgae)); 
+
+  
+
+  //Command toggle for field centric
+  
+  
 
   /*******Subsystem DEFAULT Commands*******/
 
+  controller.Y().OnTrue(std::move(toggleFieldCentric));
+
+  controller2.X().OnTrue(SetAllKinematics(CoralLoad));
+  controller2.Y().OnTrue(SetAllKinematics(startingPose));
+  coDpadDown.OnTrue(SetAllKinematics(L1Pose));  
+  coDpadRight.OnTrue(SetAllKinematics(L2Pose));  
+  coDpadLeft.OnTrue(SetAllKinematics(L3Pose));  
+  coDpadUp.OnTrue(SetAllKinematics(L4Pose));
+
+  controller2.A().OnTrue(SetAllKinematics(L2AlgaeDescore));  
+  controller2.B().OnTrue(SetAllKinematics(L4Pose2));
+
+
   m_drive.SetDefaultCommand(frc2::cmd::Run(
     [this] {
+      SmartDashboard::PutNumber("Subsystem Target", TrackingTarget);
+      // store control inputs for driving
       double x = -controller.GetLeftY();
       double y = -controller.GetLeftX();
       double turnX = controller.GetRightX();
 
+      tagOverrideDisable = SmartDashboard::GetBoolean("detectorOverride", true);
+      
+      // zero out axes if they fall within deadzone
       if (x > -DriveConstants::kDriveDeadzone && x < DriveConstants::kDriveDeadzone)
           x = 0.0;
       if (y > -DriveConstants::kDriveDeadzone && y < DriveConstants::kDriveDeadzone)
           y = 0.0;
 
+      // put speeds through a polynomial to smooth out joystick input
+      // check the curve out here: https://www.desmos.com/calculator/65tpwhxyai the range between 0.0 to 1.0 is used for the motors
+      // change driveCurveExtent to modify curve strength
       float xSpeed = DriveConstants::kDriveCurveExtent * pow(x, 3) + (1 - DriveConstants::kDriveCurveExtent) * x;
       float ySpeed = DriveConstants::kDriveCurveExtent * pow(y, 3) + (1 - DriveConstants::kDriveCurveExtent) * y;
       float turn = 0.95 * pow(turnX, 3) + (1 - 0.95) * turnX;
-
+      // pass filtered inputs to Drive function
+      // inputs will be between -1.0 to 1.0, multiply by intended speed range in mps/deg_per_s when passing
       double cascadeAdjust = 1.0 - (cascade.GetPosition() - CascadeConstants::kStartPosition).value() / 1.2;
       if(cascadeAdjust > 1.0) cascadeAdjust = 1.0;
       if(cascadeAdjust < 0.15) cascadeAdjust = 0.15;
@@ -89,12 +160,28 @@ RobotContainer::RobotContainer() {
         xSpeed * DriveConstants::kDriveTranslationLimit * cascadeAdjust, 
         ySpeed * DriveConstants::kDriveTranslationLimit * cascadeAdjust, 
         turn * -270.0_deg_per_s}, true, fieldCentric);
+      SmartDashboard::PutData(std::move(&autonChooser));  // send auton selector to Shuffleboard
+
     }, {&m_drive}));
+
+/*   intake.SetDefaultCommand(frc2::cmd::Run(
+    [this] {
+      if(TrackingTarget == GlobalConstants::kCoralMode || TrackingTarget == GlobalConstants::kArbitrary){
+        double power = controller.GetLeftTriggerAxis() - controller.GetRightTriggerAxis();
+        if(fabs(power) < 0.1) power = 0.0;
+        intake.SetPower(power);
+
+
+
+      }
+    },
+  {&intake})); */
 
   algae.SetDefaultCommand(frc2::cmd::Run(
     [this] {
       if(TrackingTarget == GlobalConstants::kAlgaeMode || TrackingTarget == GlobalConstants::kArbitrary) {
-        double power = controller.GetLeftTriggerAxis() - (controller.GetRightTriggerAxis()/2);
+        double power = controller.GetLeftTriggerAxis()/32.0 - (controller.GetRightTriggerAxis()/2);
+        //power = controller.GetLeftTriggerAxis() - (controller.GetRightTriggerAxis()/2);
         if(fabs(power) < 0.1) power = 0.0;
         algae.SetIntakePower(power);
       }
@@ -107,7 +194,8 @@ RobotContainer::RobotContainer() {
   coral.SetDefaultCommand(frc2::cmd::Run(
     [this] {
       if(TrackingTarget == GlobalConstants::kCoralMode || TrackingTarget == GlobalConstants::kArbitrary) {
-        double power = (controller.GetLeftTriggerAxis()/2.5) - controller.GetRightTriggerAxis();
+        double power = (controller.GetLeftTriggerAxis()/32.0) - controller.GetRightTriggerAxis();
+        //power = (controller.GetLeftTriggerAxis()/2.5) - controller.GetRightTriggerAxis();
         if(fabs(power) < 0.1) power = 0.0;
         coral.SetIntakePower(power);
       }
@@ -116,6 +204,25 @@ RobotContainer::RobotContainer() {
       }
     }, 
   {&coral}));
+
+  // climb.SetDefaultCommand(frc2::cmd::Run(
+  //   [this] {
+          
+  //   }, 
+  // {&climb}));
+
+  // funnel.SetDefaultCommand(frc2::cmd::Run(
+  //   [this] {
+
+  //   },  
+  // {&funnel}));
+
+ /*  led.SetDefaultCommand(frc2::cmd::Run(
+    [this] {
+    
+    },
+  {&led})); */
+
 }
 
 frc2::CommandPtr RobotContainer::SetAllKinematics(RobotContainer::KinematicsPose pose) {
@@ -123,10 +230,12 @@ frc2::CommandPtr RobotContainer::SetAllKinematics(RobotContainer::KinematicsPose
     frc2::cmd::RunOnce(
       [this, pose]() {
         cascade.SetTargetPosition(pose.cascadePose);
+        // Add other subsystems
       }, {&cascade}),
     frc2::cmd::RunOnce(
       [this, pose]() {
         coral.SetTargetAngle(pose.coralAngle);
+        // Add other subsystems
       }, {&coral})
   );
 }
@@ -147,4 +256,8 @@ void RobotContainer::EnableTagTracking() {
 
 void RobotContainer::SetSlew(bool state) {
   m_drive.SetLimiting(state);
-} 
+}
+
+frc2::Command* RobotContainer::GetAutonomousCommand() {
+  return autonChooser.GetSelected();
+}

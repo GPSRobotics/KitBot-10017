@@ -1,63 +1,191 @@
+// Copyright (c) FIRST and other WPILib contributors.
+// Open Source Software; you can modify and/or share it under the terms of
+// the WPILib BSD license file in the root directory of this project.
+
 #pragma once
 
 #include <frc2/command/SubsystemBase.h>
-#include <rev/CANSparkMax.h> // For Spark MAX motors
-#include <units/angle.h>
-#include <frc/smartdashboard/SmartDashboard.h>
+#include <ctre/phoenix6/TalonFX.hpp>
+#include <ctre/phoenix6/CANcoder.hpp>
+#include <frc2/command/Command.h>
+#include <frc2/command/Commands.h>
+#include "rev/SparkFlex.h"
+#include "rev/config/SparkFlexConfig.h"
+
 #include "Constants.h"
 
 using namespace frc;
-using namespace rev;
+// using namespace ctre::phoenix6;
+using namespace rev::spark;
 using namespace CoralConstants;
 
 class CoralSubsystem : public frc2::SubsystemBase {
-public:
-    CoralSubsystem();
+ public:
+  CoralSubsystem();
 
-    void Periodic() override;
+  /**
+   * Will be called periodically whenever the CommandScheduler runs.
+   */
+  void Periodic() override;
+  
+            /* INTAKE FUNCTIONS */
+    
+  /**
+   * Turns the Intake state to kPowerMode.
+   */
+  void IntakeOn();
 
-    // Intake control
-    void SetIntakePower(double power);
-    double GetIntakePower() const;
-    void SetIntakeState(IntakeStates state);
-    IntakeStates GetIntakeState() const;
+  /**
+   * Turns the Intake state to kOff.
+   */
+  void IntakeOff();
 
-    // Wrist control
-    void SetWristPower(double power);
-    double GetWristPower() const;
-    void SetWristState(WristStates state);
-    WristStates GetWristState() const;
-    void SetTargetAngle(units::degree_t angle);
-    units::degree_t GetAngle() const;
-    bool IsAtTarget() const;
+  /**
+   * Sets the power for the Intake to use when in kPowerMode.
+   *
+   * @param power the power for the intake to use
+   */
+  void SetIntakePower(double newPower);
 
-    // Command factory
-    frc2::CommandPtr GetMoveCommand(units::degree_t target);
+  /**
+   * Get the current power used by the intake.
+   * 
+   * @return current intake power
+   */
+  double GetIntakePower();
 
-private:
-    // Motors
-    CANSparkMax wristMotor;
-    CANSparkMax intakeMotor;
+  /**
+   * Sets the current state of the Intake.
+   * 
+   * @param newState the new state for the Intake.
+   */
+  void SetIntakeState(int newState);
+  
+  /**
+   * Returns the current state of the Intake.
+   *
+   * @return The current state of the Intake
+   */
+  int GetIntakeState();
 
-    // Encoder for wrist position
-    SparkMaxRelativeEncoder wristEncoder;
+  /**
+   * Sets Intake brake mode.
+   */
+  void SetIntakeBrakeMode(bool state);
 
-    // PID controller for wrist
-    SparkMaxPIDController wristPID;
+  /**
+   * Initially configure onboard TalonFX settings for motors.
+   */
+  // void ConfigIntake();
 
-    // Subsystem states
-    IntakeStates intakeState = IntakeStates::kIntakeOff;
-    WristStates wristState = WristStates::kWristOff;
+  /**
+  * Gets if a piece of coral is indexed.
+  */
+  bool IsCoralIndexed();
+  
+            /* WRIST FUNCTIONS */
 
-    // Power and target angle
-    double intakePower = kIntakeDefaultPower;
-    double wristPower = kWristDefaultPower;
-    units::degree_t wristAngle = kWristStartAngle;
+  /**
+   * Turns the Intake state to kAngleMode.
+   */
+  void WristOn();
 
-    // Configuration methods
-    void ConfigureWrist();
-    void ConfigureIntake();
+  /**
+   * Turns the Intake state to kOff.
+   */
+  void WristOff();
 
-    // Helper methods
-    double CalculateFeedForward(units::degree_t angle) const;
+  /**
+   * Sets the power for the Wrist to use when in kPowerMode.
+   *
+   * @param power the power for the wrist to use
+   */
+  void SetWristPower(double newPower);
+  
+  /**
+   * Get the current power used by the Wrist.
+   * 
+   * @return current wrist power
+   */
+  double GetWristPower();
+
+  /**
+   * Sets the target angle of the Wrist.
+   * 
+   * @param newAngle new angle for the wrist
+   */
+  void SetTargetAngle(units::angle::degree_t newAngle);
+
+  /**
+   * Returns the current estimated angle of the wrist.
+   * 
+   * @return current wrist angle
+   */
+  units::angle::degree_t GetAngle();
+
+  /**
+   * Returns the position from the TalonFX motor controller.
+   *
+   * @return the TalonFX reported position
+   */
+  double GetWristPosition();
+
+  /**
+   * Returns whether the subsystem is at its intended target position.
+   * 
+   * @return If the wrist is at it's target
+   */
+  bool IsAtTarget();
+
+  /**
+   * Sets the current state of the Wrist.
+   * 
+   * @param newState the new state for the Wrist.
+   */
+  void SetWristState(int newState);
+  
+  /**
+   * Returns the current state of the Wrist.
+   *
+   * @return The current state of the Wrist
+   */
+  int GetWristState();
+
+  /**
+   * Sets Wrist brake mode.
+   * 
+   * @param state turn the brakes on or off
+   */
+  void SetWristBrakeMode(bool state);
+
+  /**
+   * Initially configure onboard TalonFX settings for motors.
+   */
+  void ConfigWrist();
+
+  /**
+   * Create command to move Subsystem
+   */
+  frc2::CommandPtr GetMoveCommand(units::angle::degree_t target);
+    
+ private:
+  // While the state is kOn the intake will run at the current power setting
+  int intakeState = CoralConstants::IntakeStates::kIntakePowerMode;
+  double intakePower = CoralConstants::kIntakeDefaultPower;
+  
+  // While the state is kOn the wrist will run on the angle mode.
+  int wristState = CoralConstants::WristStates::kWristAngleMode;
+  double wristPower = CoralConstants::kWristDefaultPower;
+  units::angle::degree_t wristAngle{kWristStartAngle + 15_deg};
+
+  // Components (e.g. motor controllers and sensors) should generally be
+  // declared private and exposed only through public methods.
+
+  // The motor controllers
+  SparkFlex wristMotor;
+  SparkFlexConfig wristConfig;
+
+
+  SparkFlex intakeMotor;
+  SparkFlexConfig intakeConfig;
 };

@@ -1,122 +1,182 @@
+// Copyright (c) FIRST and other WPILib contributors.
+// Open Source Software; you can modify and/or share it under the terms of
+// the WPILib BSD license file in the root directory of this project.
+
 #include "subsystems/CoralSubsystem/CoralSubsystem.h"
 
-CoralSubsystem::CoralSubsystem()
-    : wristMotor{kWristPort, CANSparkMax::MotorType::kBrushless},
-      intakeMotor{kIntakePort, CANSparkMax::MotorType::kBrushless},
-      wristEncoder{wristMotor.GetEncoder()},
-      wristPID{wristMotor.GetPIDController()} {
-    // Configure motors and encoders
-    ConfigureWrist();
-    ConfigureIntake();
+#include <frc/geometry/Rotation2d.h>
+#include <iostream>
+#include <frc/kinematics/DifferentialDriveWheelSpeeds.h>
+#include <frc/smartdashboard/SmartDashboard.h>
 
-    // Initialize SmartDashboard
-    frc::SmartDashboard::PutNumber("Coral Wrist Target Angle", wristAngle.value());
-    frc::SmartDashboard::PutNumber("Coral Wrist Power", wristPower);
-    frc::SmartDashboard::PutNumber("Coral Intake Power", intakePower);
+
+using namespace CoralConstants;
+using namespace frc;
+
+CoralSubsystem::CoralSubsystem()
+  : wristMotor{kWristPort, SparkLowLevel::MotorType::kBrushless},
+    intakeMotor{kIntakePort, SparkLowLevel::MotorType::kBrushless} {
+      /*wristMotor.SetPosition(0.0_tr);*/
+      SmartDashboard::PutNumber("Coral Angle", wristAngle.value());
+
+      // ConfigIntake();
+      ConfigWrist();
+
+      /*SetTargetAngle(kWristStartAngle);*/
+
 }
 
 void CoralSubsystem::Periodic() {
-    // Update wrist control
-    if (wristState == WristStates::kWristOff) {
-        wristMotor.Set(0.0);
-    } else if (wristState == WristStates::kWristPowerMode) {
-        wristMotor.Set(wristPower);
-    } else if (wristState == WristStates::kWristAngleMode) {
-        // Calculate feedforward to counteract gravity
-        double feedForward = CalculateFeedForward(wristAngle);
-        units::turn_t posTarget{(wristAngle - kWristStartAngle) / kTurnsPerDegree};
+  // Implementation of subsystem periodic method goes here
+  // Wrist Control
+  SetTargetAngle(units::angle::degree_t{SmartDashboard::GetNumber("Coral Angle", GetAngle().value())});
+  SmartDashboard::PutNumber("Coral Actual", GetAngle().value());
+  if(wristState == WristStates::kWristOff) {
+    wristMotor.Set(0.0);
+  } else if(wristState == WristStates::kWristPowerMode) {
+    wristMotor.Set(wristPower);
+  } else if(wristState == WristStates::kWristAngleMode) {
+    // feed forwards should be a changing constant that increases as the wrist moves further. It should be a static amount of power to overcome gravity.
 
-        // Set target position with feedforward
-        wristPID.SetReference(posTarget.value(), CANSparkMax::ControlType::kPosition, 0, feedForward);
 
-        // Log data to SmartDashboard
-        frc::SmartDashboard::PutNumber("Coral Wrist Position", wristEncoder.GetPosition());
-        frc::SmartDashboard::PutNumber("Coral Wrist Angle", GetAngle().value());
-        frc::SmartDashboard::PutNumber("Coral Wrist Feedforward", feedForward);
-    }
+    SmartDashboard::PutNumber("coralWristTr", wristMotor.GetEncoder().GetPosition());  // print to Shuffleboard
+    SmartDashboard::PutNumber("coralAngle", GetAngle().value());  // print to Shuffleboard
+    double feedForward = fabs(sin(wristAngle.value())) * kMaxFeedForward;
+    SmartDashboard::PutNumber("Coral Target", wristAngle.value());
+    units::angle::turn_t posTarget{(wristAngle - kWristStartAngle).value() * kTurnsPerDegree};
+    SmartDashboard::PutNumber("coralTrTarget", posTarget.value());
+    wristMotor.GetClosedLoopController().SetReference(posTarget.value(), SparkBase::ControlType::kPosition);
 
-    // Update intake control
-    if (intakeState == IntakeStates::kIntakeOff) {
-        intakeMotor.Set(0.0);
+    // Intake Control
+    if(intakeState == IntakeStates::kIntakeOff) {
+      intakeMotor.Set(0.0);
     } else {
-        intakeMotor.Set(intakePower);
+      intakeMotor.Set(intakePower);
     }
-
-    // Log intake state to SmartDashboard
-    frc::SmartDashboard::PutString("Coral Intake State", intakeState == IntakeStates::kIntakeOff ? "Off" : "On");
+  }
 }
 
-void CoralSubsystem::SetIntakePower(double power) {
-    intakePower = std::clamp(power, -1.0, 1.0);
+void CoralSubsystem::IntakeOn() {
+  intakeState = IntakeStates::kIntakePowerMode;
 }
 
-double CoralSubsystem::GetIntakePower() const {
-    return intakePower;
+void CoralSubsystem::IntakeOff() {
+  intakeState = IntakeStates::kIntakeOff;
 }
 
-void CoralSubsystem::SetIntakeState(IntakeStates state) {
-    intakeState = state;
+void CoralSubsystem::SetIntakePower(double newPower) {
+  intakePower = newPower;
 }
 
-IntakeStates CoralSubsystem::GetIntakeState() const {
-    return intakeState;
+double CoralSubsystem::GetIntakePower() {
+  return intakePower;
 }
 
-void CoralSubsystem::SetWristPower(double power) {
-    wristPower = std::clamp(power, -1.0, 1.0);
+void CoralSubsystem::SetIntakeState(int newState) {
+  intakeState = newState;
 }
 
-double CoralSubsystem::GetWristPower() const {
-    return wristPower;
+int CoralSubsystem::GetIntakeState() {
+  return intakeState;
 }
 
-void CoralSubsystem::SetWristState(WristStates state) {
-    wristState = state;
+// void AlgaeSubsystem::SetIntakeBrakeMode(bool state) {
+//   signals::NeutralModeValue mode;
+//   if(state) mode = signals::NeutralModeValue::Brake;
+//   else mode = signals::NeutralModeValue::Coast;
+//   configs::MotorOutputConfigs updated;
+//   updated.WithNeutralMode(mode);
+//   intakeMotor.GetConfigurator().Apply(updated, 50_ms);
+// }
+
+// void AlgaeSubsystem::ConfigIntake() {
+//   configs::TalonFXConfiguration algaeIntakeConfig{};
+
+//   algaeIntakeConfig.MotorOutput.PeakReverseDutyCycle = -1.0;
+//   algaeIntakeConfig.MotorOutput.PeakForwardDutyCycle = 1.0;
+//   algaeIntakeConfig.MotorOutput.Inverted = true;
+
+//   intakeMotor.GetConfigurator().Apply(algaeIntakeConfig);
+// }
+
+bool CoralSubsystem::IsCoralIndexed() {
+  // Add when limit switch is added
+  return false;
 }
 
-WristStates CoralSubsystem::GetWristState() const {
-    return wristState;
+void CoralSubsystem::WristOn() {
+  wristState = WristStates::kWristAngleMode;
 }
 
-void CoralSubsystem::SetTargetAngle(units::degree_t angle) {
-    wristAngle = std::clamp(angle, kWristDegreeMin, kWristDegreeMax);
-    frc::SmartDashboard::PutNumber("Coral Wrist Target Angle", wristAngle.value());
+void CoralSubsystem::WristOff() {
+  wristState = WristStates::kWristOff;
 }
 
-units::degree_t CoralSubsystem::GetAngle() const {
-    return units::degree_t{wristEncoder.GetPosition() / kTurnsPerDegree} + kWristStartAngle;
+void CoralSubsystem::SetWristPower(double newPower) {
+  wristPower = newPower;
 }
 
-bool CoralSubsystem::IsAtTarget() const {
-    auto angle = GetAngle();
-    return angle > wristAngle - (kWristAngleDeadzone / 2) && angle < wristAngle + (kWristAngleDeadzone / 2);
+double CoralSubsystem::GetWristPower() {
+  return wristPower;
 }
 
-frc2::CommandPtr CoralSubsystem::GetMoveCommand(units::degree_t target) {
-    return frc2::cmd::RunOnce([this, target]() { SetTargetAngle(target); }, {this});
+void CoralSubsystem::SetTargetAngle(units::angle::degree_t newAngle) {
+  wristAngle = newAngle;
+  if(wristAngle < kWristDegreeMin) wristAngle = kWristDegreeMin;
+  if(wristAngle > kWristDegreeMax) wristAngle = kWristDegreeMax;
+  SmartDashboard::PutNumber("Coral Angle", wristAngle.value());
 }
 
-void CoralSubsystem::ConfigureWrist() {
-    wristMotor.RestoreFactoryDefaults();
-    wristMotor.SetIdleMode(CANSparkMax::IdleMode::kBrake);
-    wristMotor.SetSmartCurrentLimit(40);
-    wristMotor.SetInverted(true);
-
-    wristPID.SetP(kPWrist);
-    wristPID.SetI(0.0);
-    wristPID.SetD(0.0);
-    wristPID.SetOutputRange(-1.0, 1.0);
-
-    wristEncoder.SetPosition(0.0);
+units::angle::degree_t CoralSubsystem::GetAngle() {
+  return units::angle::degree_t{(GetWristPosition() / kTurnsPerDegree)} + kWristStartAngle;
 }
 
-void CoralSubsystem::ConfigureIntake() {
-    intakeMotor.RestoreFactoryDefaults();
-    intakeMotor.SetIdleMode(CANSparkMax::IdleMode::kBrake);
-    intakeMotor.SetSmartCurrentLimit(40);
-    intakeMotor.SetInverted(false);
+double CoralSubsystem::GetWristPosition() {
+  return wristMotor.GetEncoder().GetPosition();
 }
 
-double CoralSubsystem::CalculateFeedForward(units::degree_t angle) const {
-    return std::sin(angle.value() * (M_PI / 180.0)) * kMaxFeedForward;
+bool CoralSubsystem::IsAtTarget() {
+  auto target = wristAngle;
+  auto angle = GetAngle();
+  bool atTarget = angle > target - (kWristAngleDeadzone / 2) && angle < target + (kWristAngleDeadzone / 2);
+  return atTarget;
+}
+
+void CoralSubsystem::SetWristState(int newState) {
+  wristState = newState;
+}
+
+int CoralSubsystem::GetWristState() {
+  return wristState;
+}
+
+frc2::CommandPtr CoralSubsystem::GetMoveCommand(units::angle::degree_t target) {
+  /*return frc2::cmd::Sequence(*/
+  /*    frc2::cmd::RunOnce([this, target]() {*/
+  /*      SetTargetAngle(target);*/
+  /*    }, {this}),*/
+  /*    frc2::cmd::WaitUntil([this, target](){*/
+  /*      return IsAtTarget();*/
+  /*    }));*/
+  return frc2::cmd::RunOnce([this, target]() {
+        SetTargetAngle(target);
+      }, {this});
+}
+void CoralSubsystem::SetWristBrakeMode(bool state) {
+
+}
+
+void CoralSubsystem::ConfigWrist() {
+  wristConfig
+    .SetIdleMode(SparkBaseConfig::IdleMode::kBrake)
+    .SmartCurrentLimit(40.0)
+    .Inverted(true)
+  .closedLoop
+    .SetFeedbackSensor(ClosedLoopConfig::FeedbackSensor::kPrimaryEncoder)
+    .P(0.1)
+    .I(0.0)
+    .D(0.0)
+    .OutputRange(-1.0, 1.0);
+
+  wristMotor.Configure(wristConfig, SparkBase::ResetMode::kResetSafeParameters, SparkBase::PersistMode::kPersistParameters);
 }

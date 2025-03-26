@@ -1,98 +1,165 @@
+// Copyright (c) FIRST and other WPILib contributors.
+// Open Soruce Software; you can modify and/or share it under the terms of
+// the WPILib BSD license file in root directory of this project.
+
 #include "subsystems/DriveSubsystem/SwerveModule.h"
 
-SwerveModule::SwerveModule(hardware::TalonFX *drivingMotor, rev::CANSparkMax *turningMotor, 
-                           DutyCycleEncoder *thetaEncoder, double thetaEncoderOffset)
-    : driveMotor(drivingMotor), sparkMaxTurn(turningMotor), neoEncoder(thetaEncoder),
-      turnEncoderOffset(thetaEncoderOffset) {
-    // Configure the turn motor
-    sparkMaxTurn->RestoreFactoryDefaults();
-    sparkMaxTurn->SetIdleMode(rev::CANSparkMax::IdleMode::kBrake);
-    sparkMaxTurn->SetSmartCurrentLimit(40);
-    sparkMaxTurn->SetInverted(false);
+#include <numbers>
+#include <frc/smartdashboard/SmartDashboard.h>
 
-    // Configure the PID controller for the turn motor
-    neoController.SetP(0.008);
-    neoController.SetI(0.0);
-    neoController.SetD(0.0);
-    neoController.SetTolerance(1.0); // Tolerance in degrees
+#include <frc/geometry/Rotation2d.h>
 
-    // Reset the encoder position
-    neoEncoder->SetPositionOffset(turnEncoderOffset);
+SwerveModule::SwerveModule(hardware::TalonFX *drivingMotor,
+                            hardware::TalonFX *turningMotor) {
+    driveMotor = drivingMotor;
+    falconTurn = turningMotor;
+}
+
+SwerveModule::SwerveModule(hardware::TalonFX *drivingMotor, SparkMax *turningMotor, 
+        DutyCycleEncoder *thetaEncoder, double thetaEncoderOffset, bool flipEncoder) {
+    usingFalcon = false;
+    driveMotor = drivingMotor;
+    neoTurn = turningMotor;
+    neoEncoder = thetaEncoder;
+    turnEncoderOffset = thetaEncoderOffset;
+    encoderFlipped = flipEncoder;
+}
+
+double SwerveModule::GetFalconTurnPosition() const {
+    return falconTurn->GetPosition().GetValueAsDouble() * 360.0;
+}
+
+double SwerveModule::GetNeoTurnPosition() const {
+    double angle = 0.0;
+    if(encoderFlipped) {
+        angle = neoEncoder->Get() - turnEncoderOffset;
+
+    } else {
+        angle = turnEncoderOffset - neoEncoder->Get();
+    }
+    if(angle < 0.0) angle = 1.0 - angle;
+    angle = fabs(1.0 - angle);
+    return (angle * DriveConstants::kTurnEncoderDegreesPerPulse) - 180.0;
+}
+
+void SwerveModule::SetFalconTurnPower(double power) {
+    falconTurn->Set(power);
+}
+
+void SwerveModule::SetNeoTurnPower(double power) {
+    neoTurn->Set(power);
 }
 
 units::meter_t SwerveModule::GetDriveEncoderDistance() const {
-    return units::meter_t{driveMotor->GetPosition().GetValue().value() * DriveConstants::kDriveDistancePerRev};
+    return units::meter_t{driveMotor->GetPosition().GetValueAsDouble() * DriveConstants::kDriveDistancePerRev};
 }
 
 units::degree_t SwerveModule::GetTurnEncoderAngle() const {
-    double encoderPosition = neoEncoder->GetAbsolutePosition() - turnEncoderOffset;
-    return units::degree_t{encoderPosition * 360.0};
+    return units::degree_t{usingFalcon ? GetFalconTurnPosition() : GetNeoTurnPosition()};
 }
 
 units::meters_per_second_t SwerveModule::GetDriveEncoderRate() const {
-    return units::meters_per_second_t{driveMotor->GetVelocity().GetValue().value() * DriveConstants::kDriveDistancePerRev};
+    return units::meters_per_second_t{driveMotor->GetVelocity().GetValueAsDouble() * DriveConstants::kDriveDistancePerRev};
 }
 
 frc::SwerveModuleState SwerveModule::GetState() const {
-    return frc::SwerveModuleState{GetDriveEncoderRate(), frc::Rotation2d{GetTurnEncoderAngle()}};
+    return {GetDriveEncoderRate(),
+            GetTurnEncoderAngle()};
 }
 
 frc::SwerveModulePosition SwerveModule::GetPosition() const {
-    return frc::SwerveModulePosition{GetDriveEncoderDistance(), frc::Rotation2d{GetTurnEncoderAngle()}};
+    return {GetDriveEncoderDistance(),
+            GetTurnEncoderAngle()};
 }
 
+// adapted from team 364s BaseFalconSwerve example
+frc::SwerveModuleState SwerveModule::Optimize(const frc::SwerveModuleState& desiredState, frc::Rotation2d currentAngle) {
+    double targetAngle = PlaceInAppropriate0To360Scope((double)currentAngle.Degrees(), (double)desiredState.angle.Degrees());
+    double targetSpeed = (double)desiredState.speed;
+    double delta = targetAngle - (double)currentAngle.Degrees();
+    if (fabs(delta) > 90.0){
+        targetSpeed *= -1.0;
+        targetAngle = delta > 90.0 ? (targetAngle - 180.0) : (targetAngle + 180.0);
+    }
+    return frc::SwerveModuleState{units::velocity::meters_per_second_t{targetSpeed}, {units::degree_t{targetAngle}}};
+}
+
+// adapted from team 364s BaseFalconSwerve example
 double SwerveModule::PlaceInAppropriate0To360Scope(double scopeReference, double newAngle) {
-    double lowerBound = scopeReference - 180.0;
-    double upperBound = scopeReference + 180.0;
+    double lowerBound;
+    double upperBound;
+    double lowerOffset = fmod(scopeReference, 360.0);
+    if (lowerOffset >= 0) {
+        lowerBound = scopeReference - lowerOffset;
+        upperBound = scopeReference + (360.0 - lowerOffset);
+    } else {
+        upperBound = scopeReference - lowerOffset;
+        lowerBound = scopeReference - (360.0 + lowerOffset);
+    }
     while (newAngle < lowerBound) {
         newAngle += 360.0;
     }
     while (newAngle > upperBound) {
         newAngle -= 360.0;
     }
+    if (newAngle - scopeReference > 180.0) {
+        newAngle -= 360.0;
+    } else if (newAngle - scopeReference < -180.0) {
+        newAngle += 360.0;
+    }
     return newAngle;
 }
 
-frc::SwerveModuleState SwerveModule::Optimize(const frc::SwerveModuleState& desiredState, frc::Rotation2d currentAngle) {
-    double targetAngle = PlaceInAppropriate0To360Scope(currentAngle.Degrees().value(), desiredState.angle.Degrees().value());
-    double delta = targetAngle - currentAngle.Degrees().value();
-    if (std::abs(delta) > 90.0) {
-        return frc::SwerveModuleState{-desiredState.speed, frc::Rotation2d{units::degree_t{targetAngle + 180.0}}};
+void SwerveModule::SetDesiredState(
+    const frc::SwerveModuleState& referenceState) {
+    frc::SwerveModuleState newReference = referenceState; 
+    if(encoderFlipped) newReference.angle = referenceState.angle * -1.0;
+
+        // frc::SmartDashboard::PutNumber("FL UNOPTIMIZED Target", (double)referenceState.angle.Degrees());
+    // Optimize the reference state to avoid spinning further than 90 degrees*
+    const auto state = Optimize(newReference, {GetTurnEncoderAngle()});
+    
+    if(usingFalcon) {
+        falconTurn->SetControl(rotation.WithPosition(units::angle::turn_t{(double)state.angle.Degrees() / DriveConstants::kTurnEncoderDegreesPerPulse}));
+    } else {
+        // frc::SmartDashboard::PutNumber("FL Target", (double)state.angle.Degrees());
+        // frc::SmartDashboard::PutNumber("Target", (double)referenceState.angle.Degrees() / DriveConstants::kTurnEncoderDegreesPerPulse);
+        // std::cout << "Neo Target: " << (double)state.angle.Degrees() / DriveConstants::kTurnEncoderDegreesPerPulse << '\n';
+        // neoController->SetReference((double)state.angle.Degrees() / DriveConstants::kTurnEncoderDegreesPerPulse, SparkMax::ControlType::kPosition);
+        // neoController->SetReference((double)referenceState.angle.Degrees() / DriveConstants::kTurnEncoderDegreesPerPulse, SparkMax::ControlType::kPosition);
+        // neoController.SetSetpoint((double)state.angle.Degrees() / DriveConstants::kTurnEncoderDegreesPerPulse);
+        neoController.SetSetpoint((double)state.angle.Degrees());
+        // frc::SmartDashboard::PutNumber("FL Target", neoController.GetSetpoint());
     }
-    return frc::SwerveModuleState{desiredState.speed, frc::Rotation2d{units::degree_t{targetAngle}}};
-}
 
-void SwerveModule::SetDesiredState(const frc::SwerveModuleState& state) {
-    // Optimize the state to minimize rotation
-    auto optimizedState = Optimize(state, frc::Rotation2d{GetTurnEncoderAngle()});
-
-    // Set the drive motor speed
-    driveMotor->SetControl(ctre::phoenix6::controls::VelocityVoltage{optimizedState.speed.value() / DriveConstants::kDriveDistancePerRev});
-
-    // Set the turn motor angle using PID
-    double targetAngle = optimizedState.angle.Degrees().value();
-    double currentAngle = GetTurnEncoderAngle().value();
-    double output = neoController.Calculate(currentAngle, targetAngle);
-    sparkMaxTurn->Set(output);
+    driveMotor->SetControl(velocity.WithVelocity(
+        units::angular_velocity::turns_per_second_t{((double)state.speed) / DriveConstants::kDriveDistancePerRev}));
 }
 
 void SwerveModule::RunPID() {
-    // Run the PID controller for the turn motor
-    double currentAngle = GetTurnEncoderAngle().value();
-    double targetAngle = neoController.GetSetpoint();
-    double output = neoController.Calculate(currentAngle, targetAngle);
-    sparkMaxTurn->Set(output);
+    neoTurn->SetInverted(true);
+    double angle = (double)GetTurnEncoderAngle();
+    double power = neoController.Calculate(PlaceInAppropriate0To360Scope(neoController.GetSetpoint(), angle));
+    // frc::SmartDashboard::PutNumber("FL Angle", angle);
+    // frc::SmartDashboard::PutNumber("FL Power", power);
+
+    neoTurn->Set(power);
 }
 
+
+// debug
 void SwerveModule::SetDrivePower(double power) {
     driveMotor->Set(power);
 }
 
 void SwerveModule::SetTurnPower(double power) {
-    sparkMaxTurn->Set(power);
+    if(usingFalcon) SetFalconTurnPower(power);
+    else SetNeoTurnPower(power);
+    // turnMotor->Set(power);
 }
 
 void SwerveModule::ResetEncoders() {
-    driveMotor->SetPosition(0.0);
-    neoEncoder->Reset();
+    driveMotor->SetPosition(units::angle::turn_t{0.0});
+    if(usingFalcon) falconTurn->SetPosition(units::angle::turn_t{0.0});
+    /*else neoEncoder->Reset();*/
 }

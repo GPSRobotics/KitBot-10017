@@ -14,73 +14,73 @@
 #include <numbers>
 #include <frc/geometry/Pose2d.h>
 
+
 namespace DriveConstants {
-    // Motor ports
+    //Wheel motors
     constexpr int kBackLeftPort = 0;
     constexpr int kFrontLeftPort = 1;
     constexpr int kBackRightPort = 2;
     constexpr int kFrontRightPort = 3;
-
-    // Turn motor ports
+    //Degree of wheel motors
     constexpr int kBackLeftThetaPort = 4;
     constexpr int kFrontLeftThetaPort = 5;
     constexpr int kBackRightThetaPort = 6;
     constexpr int kFrontRightThetaPort = 7;
 
-    // Encoder ports
-    constexpr int kBackLeftEncoderPort = 0;
-    constexpr int kFrontLeftEncoderPort = 1;
-    constexpr int kBackRightEncoderPort = 2;
-    constexpr int kFrontRightEncoderPort = 3;
+    constexpr int kBackLeftEncoderPort = 3;
+    constexpr int kFrontLeftEncoderPort = 2;
+    constexpr int kBackRightEncoderPort = 8;
+    constexpr int kFrontRightEncoderPort = 0;
+    
+    constexpr double kBLeftMagPos = 0.505863762646594;
 
-    // Encoder offsets (in rotations)
-    constexpr double kBLeftMagPos = 0.220534655513366;
-    constexpr double kFLeftMagPos = 0.24972238124306;
-    constexpr double kBRightMagPos = 0.020010375500259;
-    constexpr double kFRightMagPos = 0.997154824928871 - 0.50;
+    
+    constexpr double kFLeftMagPos = 0.253170756329269;
+    constexpr double kBRightMagPos = 0.847834921195873 - 0.5;
+    constexpr double kFRightMagPos = 0.882721822068046;
+    
+    // info for odometry
+    constexpr int kEncoderResolution = 4096;
+    constexpr auto kDriveBaseRadius = 0.319786_m;
+    constexpr double kWheelRadius = 0.0381;
+    constexpr double kDriveRatio = 1 / 4.13;
+    constexpr double kTurnRatio = 1 / 10.29;
+    constexpr double kDriveDistancePerRev = (2 * std::numbers::pi * kWheelRadius) * kDriveRatio;
+    // constexpr double kDriveEncoderDistancePerPulse = (2 * std::numbers::pi * kWheelRadius / (double)kEncoderResolution) * kDriveRatio;
+    // constexpr double kTurnEncoderDegreesPerPulse = (360.0 / (double)kEncoderResolution) * kTurnRatio;
+    constexpr double kTurnEncoderDegreesPerPulse = 360.0;
 
-    // Physical dimensions
-    constexpr units::meter_t kWheelRadius = 0.0381_m;
-    constexpr units::meter_t kDriveBaseRadius = 0.319786_m;
-    constexpr double kDriveRatio = 1 / 4.13; // Gear ratio for drive motors
-    constexpr double kTurnRatio = 1 / 10.29; // Gear ratio for turn motors
-    constexpr units::meter_t kDriveDistancePerRev = (2 * std::numbers::pi * kWheelRadius) * kDriveRatio;
+    // states
+    constexpr int kArbitrary = 0;
 
-    // PID constants
-    constexpr double kDriveP = 0.08; // Proportional gain for drive motors
-    constexpr double kDriveV = 0.1345313787460327; // Velocity feedforward for drive motors
-    constexpr double kTurnP = 80.0; // Proportional gain for turn motors
-    constexpr double kTurnPRatio = 10.279000282287598; // Scaling factor for turn motor PID
+    // TalonFX config
+    constexpr double kDriveP = 0.08;
+    constexpr double kDriveV = 0.1345313787460327;
+    constexpr units::time::second_t kDriveRamp = 0.0_s;
+    constexpr units::current::ampere_t kDriveCurrentLimit = 30.0_A;
+    constexpr double kTurnP = 80.0;
+    constexpr double kTurnPRatio = 10.279000282287598;
 
-    // Rate limiting
-    constexpr units::meters_per_second_squared_t kDriveAccelerationLimit = 9.0_mps_sq;
-    constexpr units::meters_per_second_squared_t kDriveDecelerationLimit = 7.0_mps_sq;
-    constexpr units::meters_per_second_t kDriveTranslationLimit = 3.3_mps;
+    constexpr auto turnKp = 0.275;
 
-    // Deadzones
-    constexpr double kDriveDeadzone = 0.2; // Deadzone for drive joystick
-    constexpr double kTurnDeadzone = 0.1; // Deadzone for turn joystick
-    constexpr double kThetaDeadzone = 2.0; // Deadzone for theta control (degrees)
+    // drivetrain controller constants
+    constexpr double kDriveDeadzone = 0.2;
+    constexpr double kTurnDeadzone = 0.1;
+    constexpr double kDriveCurveExtent = 0.8;
+    constexpr auto kDriveAccelerationLimit = 9.0_mps_sq;
+    constexpr auto kDriveDecelerationLimit = 7.0_mps_sq;
+    constexpr auto kDriveTranslationLimit = 3.3_mps;
+    constexpr double kTxAdjust = 0.5;
+    constexpr double kAlignP = 0.5;
+    constexpr double kPVelTurnOffset = -2.0;
+    constexpr double kPVelDistOffset = 0.0;
+    constexpr double kDistMultiplier = 1.5;
+    constexpr int kDistSamples = 5;
+    constexpr double kPNote = 0.3;
+    constexpr double kPYTrans = 0.1;
+    constexpr double kThetaDeadzone = 2.0;
 
-    // Alignment constants
-    constexpr double kTxAdjust = 0.5; // Adjust for target alignment
-    constexpr double kAlignP = 0.5; // Proportional gain for alignment
-    constexpr double kPVelTurnOffset = -2.0; // Velocity offset for turning
-    constexpr double kPVelDistOffset = 0.0; // Velocity offset for distance
-    constexpr double kDistMultiplier = 1.5; // Multiplier for distance calculations
-    constexpr int kDistSamples = 5; // Number of samples for distance averaging
+    constexpr units::kilogram_t kRobotWeight = 54.43_kg;
+    constexpr auto kMOI = 60;
 
-    // Robot properties
-    constexpr units::kilogram_t kRobotWeight = 54.43_kg; // Weight of the robot
-    constexpr double kMOI = 60; // Moment of inertia (placeholder value)
-
-    // Swerve module locations relative to the center of the robot
-    constexpr frc::Translation2d frontLeftLocation{0.319786_m, 0.319786_m};
-    constexpr frc::Translation2d frontRightLocation{0.319786_m, -0.319786_m};
-    constexpr frc::Translation2d backLeftLocation{-0.319786_m, 0.319786_m};
-    constexpr frc::Translation2d backRightLocation{-0.319786_m, -0.319786_m};
-
-    // Kinematics for swerve drive
-    constexpr frc::SwerveDriveKinematics<4> kDriveKinematics{
-        frontLeftLocation, frontRightLocation, backLeftLocation, backRightLocation};
 }

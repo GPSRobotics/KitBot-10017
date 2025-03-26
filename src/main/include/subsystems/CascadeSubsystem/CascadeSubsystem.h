@@ -1,54 +1,106 @@
+// Copyright (c) FIRST and other WPILib contributors.
+// Open Source Software; you can modify and/or share it under the terms of
+// the WPILib BSD license file in the root directory of this project.
+
 #pragma once
 
 #include <frc2/command/SubsystemBase.h>
-#include <rev/CANSparkMax.h> // For Spark MAX motors
-#include <units/length.h>
-#include <frc/smartdashboard/SmartDashboard.h>
+#include <ctre/phoenix6/TalonFX.hpp>
+#include <ctre/phoenix6/CANcoder.hpp>
+#include <frc2/command/Command.h>
+#include <frc2/command/Commands.h>
+#include "rev/SparkMax.h"
+#include "rev/config/SparkMaxConfig.h"
 #include "Constants.h"
 
 using namespace frc;
-using namespace rev;
-using namespace CascadeConstants;
+using namespace ctre::phoenix6;
+using namespace rev::spark;
 
 class CascadeSubsystem : public frc2::SubsystemBase {
-public:
-    CascadeSubsystem();
+ public:
+  CascadeSubsystem();
 
-    void Periodic() override;
+  /**
+   * Will be called periodically whenever the CommandScheduler runs.
+   */
+  void Periodic() override;
+  
+  /**
+   * Turns the Cascade state to kOff.
+   */
+  void Off();
+  
+  /**
+   * Turns the Cascade state to kPowerMode.
+   */
+  void On();
 
-    // State control
-    void SetState(CascadeStates state);
-    CascadeStates GetState() const;
+  /**
+   * Sets the power for the Cascade to use when in kPowerMode.
+   *
+   * @param power the power for the Cascade to use
+   */
+  void SetPower(double newPower);
 
-    // Power control
-    void SetPower(double power);
-    double GetPower() const;
+  /**
+   * Returns the current state of the Cascade.
+   *
+   * @return The current state of the Cascade
+   */
+  int GetState();
 
-    // Position control
-    void SetTargetPosition(units::meter_t position);
-    units::meter_t GetPosition() const;
-    bool IsAtTarget() const;
+  /**
+   * Sets the current state of the Cascade.
+   */
+  void SetState(int newState);
 
-    // Brake mode
-    void SetBrakeMode(bool brake);
+  /**
+   * Returns the current estimated angle of the Cascade Subsystem.
+   */
+  units::length::meter_t GetPosition();
 
-    // Command factory
-    frc2::CommandPtr GetMoveCommand(units::meter_t target);
+  /**
+   * Sets the target angle of the Cascade.
+   */
+  void SetTargetPosition(units::length::meter_t newPosition);
 
-private:
-    // Motor and encoder
-    CANSparkMax motor;
-    SparkMaxRelativeEncoder encoder;
-    SparkMaxPIDController pidController;
+  /**
+   * Returns whether the subsystem is at its intended target position.
+   */
+  bool IsAtTarget();
 
-    // Subsystem state
-    CascadeStates state = CascadeStates::kPositionMode;
-    double power = kDefaultPower;
-    units::meter_t targetPosition = kStartPosition;
+  /**
+   * Sets the state of the Cascade brakes.
+   *
+   * @param state the state of the brakes.
+   */
+  void SetBrakeMode(bool state);
 
-    // Configuration methods
-    void ConfigureMotors();
+  /**
+   * Initially configure onboard TalonFX settings for motors.
+   */
+  void ConfigMotors();
 
-    // Helper methods
-    units::turn_t PositionToTurns(units::meter_t position) const;
+  /**
+   * Create command to move Subsystem
+   */
+  frc2::CommandPtr GetMoveCommand(units::length::meter_t target);
+    
+ private:
+  // while the state is kOn the Cascade will run at the current power setting
+  int state = CascadeConstants::CascadeStates::kPositionMode;
+  double power = CascadeConstants::kDefaultPower;
+  units::length::meter_t position{CascadeConstants::kStartPosition};
+
+  // Components (e.g. motor controllers and sensors) should generally be
+  // declared private and exposed only through public methods.
+
+  // The motor controllers
+  SparkMax motor;
+
+  // hardware::CANcoder encoder;
+
+  controls::PositionVoltage positionController{0_tr};
+  // controls::MotionMagicVoltage positionController{0_tr};
 };
