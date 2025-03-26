@@ -103,7 +103,7 @@ class RobotContainer {
   int TrackingTarget = GlobalConstants::kCoralMode;
   
   // The robot's subsystems
-  AlgaeSubsystem algae{};
+  // AlgaeSubsystem algae{};
 
   DriveSubsystem m_drive{&TrackingTarget};
   

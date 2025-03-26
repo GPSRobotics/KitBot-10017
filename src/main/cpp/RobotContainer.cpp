@@ -119,13 +119,23 @@ RobotContainer::RobotContainer() {
   controller.Y().OnTrue(std::move(toggleFieldCentric));
 
   controller2.X().OnTrue(SetAllKinematics(CoralLoad));
-  controller2.Y().OnTrue(SetAllKinematics(startingPose));
+  controller2.Start().OnTrue(SetAllKinematics(startingPose));
   coDpadDown.OnTrue(SetAllKinematics(L1Pose));  
   coDpadRight.OnTrue(SetAllKinematics(L2Pose));  
   coDpadLeft.OnTrue(SetAllKinematics(L3Pose));  
   coDpadUp.OnTrue(SetAllKinematics(L4Pose));
 
+  controller.LeftStick().OnTrue(SetAllKinematics(CoralLoad));
+  controller.Start().OnTrue(SetAllKinematics(startingPose));
+  mainDpadDown.OnTrue(SetAllKinematics(L1Pose));  
+  mainDpadRight.OnTrue(SetAllKinematics(L2Pose));  
+  mainDpadLeft.OnTrue(SetAllKinematics(L3Pose));  
+  mainDpadUp.OnTrue(SetAllKinematics(L4Pose));
+
+  controller.A().OnTrue(SetAllKinematics(L2AlgaeDescore));  
   controller2.A().OnTrue(SetAllKinematics(L2AlgaeDescore));  
+  
+  controller.B().OnTrue(SetAllKinematics(L4Pose2));
   controller2.B().OnTrue(SetAllKinematics(L4Pose2));
 
 
@@ -177,31 +187,31 @@ RobotContainer::RobotContainer() {
     },
   {&intake})); */
 
-  algae.SetDefaultCommand(frc2::cmd::Run(
-    [this] {
-      if(TrackingTarget == GlobalConstants::kAlgaeMode || TrackingTarget == GlobalConstants::kArbitrary) {
-        double power = controller.GetLeftTriggerAxis()/32.0 - (controller.GetRightTriggerAxis()/2);
-        //power = controller.GetLeftTriggerAxis() - (controller.GetRightTriggerAxis()/2);
-        if(fabs(power) < 0.1) power = 0.0;
-        algae.SetIntakePower(power);
-      }
-      else {
-        algae.SetIntakePower(0.0);
-      }
-    }, 
-  {&algae})); 
+  // algae.SetDefaultCommand(frc2::cmd::Run(
+  //   [this] {
+  //     if(TrackingTarget == GlobalConstants::kAlgaeMode || TrackingTarget == GlobalConstants::kArbitrary) {
+  //       double power = controller.GetLeftTriggerAxis()/32.0 - (controller.GetRightTriggerAxis()/2);
+  //       //power = controller.GetLeftTriggerAxis() - (controller.GetRightTriggerAxis()/2);
+  //       if(fabs(power) < 0.1) power = 0.0;
+  //       algae.SetIntakePower(power);
+  //     }
+  //     else {
+  //       algae.SetIntakePower(0.0);
+  //     }
+  //   }, 
+  // {&algae})); 
 
   coral.SetDefaultCommand(frc2::cmd::Run(
     [this] {
-      if(TrackingTarget == GlobalConstants::kCoralMode || TrackingTarget == GlobalConstants::kArbitrary) {
-        double power = (controller.GetLeftTriggerAxis()/32.0) - controller.GetRightTriggerAxis();
-        //power = (controller.GetLeftTriggerAxis()/2.5) - controller.GetRightTriggerAxis();
-        if(fabs(power) < 0.1) power = 0.0;
-        coral.SetIntakePower(power);
+      double power = 0.0;
+      power = (controller.GetLeftTriggerAxis()) - controller.GetRightTriggerAxis();
+      //power = (controller.GetLeftTriggerAxis()/2.5) - controller.GetRightTriggerAxis();
+      if(fabs(power) < 0.1) power = 0.0;
+      if(fabs(power) == 0.0) {
+        power = (controller2.GetLeftTriggerAxis()) - controller2.GetRightTriggerAxis();
       }
-      else {
-        coral.SetIntakePower(0.0);
-      }
+      if(fabs(power) < 0.1) power = 0.0;
+      coral.SetIntakePower(power);      
     }, 
   {&coral}));
 

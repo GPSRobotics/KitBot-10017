@@ -11,6 +11,8 @@
 #include <frc2/command/Commands.h>
 #include "rev/SparkFlex.h"
 #include "rev/config/SparkFlexConfig.h"
+#include "rev/SparkMax.h"
+#include "rev/config/SparkMaxConfig.h"
 
 #include "Constants.h"
 
@@ -182,8 +184,8 @@ class CoralSubsystem : public frc2::SubsystemBase {
   // declared private and exposed only through public methods.
 
   // The motor controllers
-  SparkFlex wristMotor;
-  SparkFlexConfig wristConfig;
+  SparkMax wristMotor;
+  SparkMaxConfig wristConfig;
 
 
   SparkFlex intakeMotor;
