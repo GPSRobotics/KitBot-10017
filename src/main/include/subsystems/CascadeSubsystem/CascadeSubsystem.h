@@ -97,7 +97,7 @@ class CascadeSubsystem : public frc2::SubsystemBase {
   // declared private and exposed only through public methods.
 
   // The motor controllers
-  SparkMax motor;
+  hardware::TalonFX motor;
 
   // hardware::CANcoder encoder;
 

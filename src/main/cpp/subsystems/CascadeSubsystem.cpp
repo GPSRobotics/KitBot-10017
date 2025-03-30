@@ -13,7 +13,7 @@ using namespace CascadeConstants;
 using namespace frc;
 
 CascadeSubsystem::CascadeSubsystem()
-  : motor{kMotorPort, rev::spark::SparkLowLevel::MotorType::kBrushless}
+  : motor{kMotorPort}
   // encoder{kEncoderPort} 
   {
     SmartDashboard::PutNumber("Cascade Position", position.value());
@@ -35,11 +35,14 @@ void CascadeSubsystem::Periodic() {
     motor.Set(power);
   } else if(state == CascadeStates::kPositionMode) {
 
-  SmartDashboard::PutNumber("cascadeTr", motor.GetEncoder().GetPosition());
+  SmartDashboard::PutNumber("leftCascadeTr", motor.GetPosition().GetValue().value());
     
     units::angle::turn_t posTarget{(position - kStartPosition).value() * kTurnsPerMeter};
     SmartDashboard::PutNumber("PositionTr", posTarget.value());
-    motor.GetClosedLoopController().SetReference(posTarget.value(), SparkBase::ControlType::kPosition);
+    // motor.GetClosedLoopController().SetReference(posTarget.value(), SparkBase::ControlType::kPosition);
+        motor.SetControl(positionController
+      .WithPosition(units::angle::turn_t{posTarget}));
+
     // left.SetControl(positionController
     //   .WithPosition(units::angle::turn_t{posTarget})
     //   .WithEnableFOC(true));
@@ -78,7 +81,8 @@ int CascadeSubsystem::GetState() {
 }
 
 units::length::meter_t CascadeSubsystem::GetPosition() {
-  return units::length::meter_t{motor.GetEncoder().GetPosition() / kTurnsPerMeter} + kStartPosition;
+  auto base = units::length::meter_t{left.GetPosition().GetValueAsDouble() / kTurnsPerMeter};
+  return base + kStartPosition;
 }
 
 void CascadeSubsystem::SetTargetPosition(units::length::meter_t newPosition) {
@@ -106,19 +110,35 @@ void CascadeSubsystem::SetBrakeMode(bool state) {
 }
 
 void CascadeSubsystem::ConfigMotors() {
-  SparkMaxConfig config{};
-  config.SetIdleMode(SparkBaseConfig::IdleMode::kBrake);
-  config.SmartCurrentLimit(40.0);
-  config.Inverted(false);
-  ClosedLoopConfig closedLoop;
-  closedLoop.SetFeedbackSensor(ClosedLoopConfig::FeedbackSensor::kPrimaryEncoder);
-  closedLoop.P(0.05);
-  closedLoop.I(0.0);
-  closedLoop.D(0.0);
-  closedLoop.OutputRange(-1.0, 1.0);
-  config.Apply(closedLoop);
+configs::TalonFXConfiguration cascadeConfig{};
+  
+  cascadeConfig.Slot0.kP = kP;
+  cascadeConfig.Slot0.kD = kD;
+  cascadeConfig.Slot0.kG = kG;
+  // cascadeConfig.Slot0.kS = 0.28;
+  // cascadeConfig.Slot0.kV = 8.5;
+  // cascadeConfig.Slot0.kA = 3.0;
+  // cascadeConfig.Slot0.kP = 8.0;
 
-  motor.Configure(config, SparkBase::ResetMode::kResetSafeParameters, SparkBase::PersistMode::kPersistParameters);
+  // cascadeConfig.MotionMagic.MotionMagicCruiseVelocity = 6.0;
+  // cascadeConfig.MotionMagic.MotionMagicAcceleration = 2.0;
+  // cascadeConfig.MotionMagic.MotionMagicJerk = 200.0;
+  
+  cascadeConfig.CurrentLimits.SupplyCurrentLimitEnable = true;
+  cascadeConfig.CurrentLimits.SupplyCurrentLimit = kCurrentLimit;
+  cascadeConfig.Feedback.FeedbackSensorSource = signals::FeedbackSensorSourceValue::RotorSensor;
+  cascadeConfig.Feedback.RotorToSensorRatio = kRotorToGearbox;
+  cascadeConfig.MotorOutput.PeakReverseDutyCycle = -1.0;
+  cascadeConfig.MotorOutput.PeakForwardDutyCycle = 1.0;
+  cascadeConfig.Feedback.SensorToMechanismRatio = 16.0;
+  cascadeConfig.ClosedLoopRamps.VoltageClosedLoopRampPeriod = kRampSeconds;
+  cascadeConfig.Audio.AllowMusicDurDisable = true;
+  
+  cascadeConfig.MotorOutput.Inverted = true;
+  // cascadeConfig.Feedback.FeedbackRemoteSensorID = kEncoderPort;
+  
+  motor.GetConfigurator().Apply(cascadeConfig);
+
 }
 
 frc2::CommandPtr CascadeSubsystem::GetMoveCommand(units::length::meter_t target) {
